@@ -430,7 +430,7 @@ redis_initialize() {
 #   None
 #########################
 redis_configure_default() {
-    info "Initializing Redis..."
+    info "Initializing Redis now ..."
 
     # This fixes an issue where the trap would kill the entrypoint.sh, if a PID was left over from a previous run
     # Exec replaces the process without creating a new one, and when the container is restarted it may have the same PID
@@ -447,7 +447,7 @@ redis_configure_default() {
     else
         cp "${REDIS_BASEDIR}/etc/redis-default.conf" "${REDIS_BASEDIR}/etc/redis.conf"
         # Default Redis config
-        debug "Setting Redis config file..."
+        debug "Setting up Redis config file..."
         redis_conf_set port "$REDIS_PORT"
         redis_conf_set dir "${REDIS_VOLUME}/data"
         redis_conf_set logfile "" # Log to stdout
@@ -486,4 +486,5 @@ redis_configure_default() {
             redis_disable_unsafe_commands
         fi
     fi
+    debug "done setting Redis config file..."
 }

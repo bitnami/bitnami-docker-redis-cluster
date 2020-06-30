@@ -141,7 +141,7 @@ redis_cluster_override_conf() {
       redis_conf_set tls-cluster yes
       redis_conf_set tls-replication yes
     fi
-
+    echo "redis_cluster_override_conf done"
 }
 
 ########################
@@ -227,24 +227,46 @@ redis_cluster_check() {
 #   None
 #########################
 redis_cluster_update_ips() {
+  debug "redis_cluster_update_ips.."
   IFS=' ' read -ra nodes <<< "$REDIS_NODES"
 
   declare -A host_2_ip_array # Array to map hosts and IPs
+
   # Update the IPs when a number of nodes > quorum change their IPs
   if [[ ! -f  "${REDIS_VOLUME}/data/nodes.sh" ]]; then
+      debug "redis_cluster_update_ips creating CLUSTER.."
+      if [[ -f  "${REDIS_VOLUME}/data/nodes_checkpoint.sh" ]]; then
+        echo "reading ${REDIS_VOLUME}/data/nodes_checkpoint.sh"
+        . "${REDIS_VOLUME}/data/nodes_checkpoint.sh"
+      fi
+      if [[ -f  "${REDIS_VOLUME}/data/nodes_copy.sh" ]]; then
+        echo "reading ${REDIS_VOLUME}/data/nodes_copy.sh"
+        . "${REDIS_VOLUME}/data/data/nodes_copy.sh"        
+      fi
       # It is the first initialization so store the nodes
       for node in "${nodes[@]}"; do
-        ip=$(wait_for_dns_lookup "$node" "$REDIS_DNS_RETRIES" 5)
-        host_2_ip_array["$node"]="$ip"
+        if [[ ! ${host_2_ip_array["$node"]+true} ]]; then
+           debug "redis_cluster_update_ips creating CLUSTER for $node $REDIS_DNS_RETRIES looking up .."
+           ip=$(wait_for_dns_lookup "$node" "$REDIS_DNS_RETRIES" 5)
+           debug "redis_cluster_update_ips creating CLUSTER for $node $REDIS_DNS_RETRIES $ip .."
+           host_2_ip_array["$node"]="$ip"
+        else
+           debug "cached $node ${host_2_ip_array["$node"]}"
+        fi
+        declare -p host_2_ip_array > "${REDIS_VOLUME}/data/nodes_checkpoint.sh"
       done
       echo "Storing map with hostnames and IPs"
       declare -p host_2_ip_array > "${REDIS_VOLUME}/data/nodes.sh"
+      rm -f ${REDIS_VOLUME}/data/nodes_checkpoint.sh
   else
+      debug "redis_cluster_update_ips updating CLUSTER.."
       # The cluster was already started
       . "${REDIS_VOLUME}/data/nodes.sh"
       # Update the IPs in the nodes.conf
       for node in "${nodes[@]}"; do
+          debug "redis_cluster_update_ips updating CLUSTER for $node $REDIS_DNS_RETRIES .."
           newIP=$(wait_for_dns_lookup "$node" "$REDIS_DNS_RETRIES" 5)
+          debug "redis_cluster_update_ips updating CLUSTER for $node $REDIS_DNS_RETRIES $newIP .."
           # The node can be new if we are updating the cluster, so catch the unbound variable error
           if [[ ${host_2_ip_array[$node]+true} ]]; then
             echo "Changing old IP ${host_2_ip_array[$node]} by the new one ${newIP}"
