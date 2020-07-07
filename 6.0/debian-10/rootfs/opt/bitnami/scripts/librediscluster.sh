@@ -241,7 +241,7 @@ redis_cluster_update_ips() {
       fi
       if [[ -f  "${REDIS_VOLUME}/data/nodes_copy.sh" ]]; then
         echo "reading ${REDIS_VOLUME}/data/nodes_copy.sh"
-        . "${REDIS_VOLUME}/data/data/nodes_copy.sh"        
+        . "${REDIS_VOLUME}/data/data/nodes_copy.sh"
       fi
       # It is the first initialization so store the nodes
       for node in "${nodes[@]}"; do
@@ -259,13 +259,19 @@ redis_cluster_update_ips() {
       declare -p host_2_ip_array > "${REDIS_VOLUME}/data/nodes.sh"
       rm -f ${REDIS_VOLUME}/data/nodes_checkpoint.sh
   else
-      debug "redis_cluster_update_ips updating CLUSTER.."
+      debug "redis_cluster_update_ips updating CLUSTER based on ${REDIS_VOLUME}/data/nodes.sh .."
       # The cluster was already started
       . "${REDIS_VOLUME}/data/nodes.sh"
+      if [[ -f  "${REDIS_VOLUME}/data/nodes_flag.sh" ]]; then
+        # delete nodes.sh to force reinitialization in order to use checkpoints
+        echo "deleting ${REDIS_VOLUME}/data/nodes.sh"
+        rm -f "${REDIS_VOLUME}/data/nodes.sh"
+      fi
       # Update the IPs in the nodes.conf
       for node in "${nodes[@]}"; do
           debug "redis_cluster_update_ips updating CLUSTER for $node $REDIS_DNS_RETRIES .."
           newIP=$(wait_for_dns_lookup "$node" "$REDIS_DNS_RETRIES" 5)
+          declare -p host_2_ip_array > "${REDIS_VOLUME}/data/nodes_flag.sh"
           debug "redis_cluster_update_ips updating CLUSTER for $node $REDIS_DNS_RETRIES $newIP .."
           # The node can be new if we are updating the cluster, so catch the unbound variable error
           if [[ ${host_2_ip_array[$node]+true} ]]; then
@@ -276,5 +282,6 @@ redis_cluster_update_ips() {
           host_2_ip_array["$node"]="$newIP"
       done
       declare -p host_2_ip_array > "${REDIS_VOLUME}/data/nodes.sh"
+      rm -f ${REDIS_VOLUME}/data/nodes_flag.sh
   fi
 }
