@@ -235,13 +235,16 @@ redis_cluster_update_ips() {
   # Update the IPs when a number of nodes > quorum change their IPs
   if [[ ! -f  "${REDIS_VOLUME}/data/nodes.sh" ]]; then
       debug "redis_cluster_update_ips creating CLUSTER.."
-      if [[ -f  "${REDIS_VOLUME}/data/nodes_checkpoint.sh" ]]; then
-        echo "reading ${REDIS_VOLUME}/data/nodes_checkpoint.sh"
-        . "${REDIS_VOLUME}/data/nodes_checkpoint.sh"
+      CHECKPOINT_FILE_PATH=${REDIS_VOLUME}/data/nodes_checkpoint.sh
+      if [[ -f  "$CHECKPOINT_FILE_PATH" ]]; then
+        echo "reading $CHECKPOINT_FILE_PATH"
+        . $CHECKPOINT_FILE_PATH
       fi
-      if [[ -f  "${REDIS_VOLUME}/data/nodes_copy.sh" ]]; then
-        echo "reading ${REDIS_VOLUME}/data/nodes_copy.sh"
-        . "${REDIS_VOLUME}/data/data/nodes_copy.sh"
+      COPY_FILE_PATH=${REDIS_VOLUME}/data/nodes_copy.sh
+      if [[ -f  "$COPY_FILE_PATH" ]]; then
+        echo "reading $COPY_FILE_PATH"
+        . $COPY_FILE_PATH
+        rm -f $COPY_FILE_PATH
       fi
       # It is the first initialization so store the nodes
       for node in "${nodes[@]}"; do
@@ -253,16 +256,17 @@ redis_cluster_update_ips() {
         else
            debug "cached $node ${host_2_ip_array["$node"]}"
         fi
-        declare -p host_2_ip_array > "${REDIS_VOLUME}/data/nodes_checkpoint.sh"
+        declare -p host_2_ip_array > $CHECKPOINT_FILE_PATH
       done
       echo "Storing map with hostnames and IPs"
       declare -p host_2_ip_array > "${REDIS_VOLUME}/data/nodes.sh"
-      rm -f ${REDIS_VOLUME}/data/nodes_checkpoint.sh
+      rm -f $CHECKPOINT_FILE_PATH
   else
       debug "redis_cluster_update_ips updating CLUSTER based on ${REDIS_VOLUME}/data/nodes.sh .."
       # The cluster was already started
       . "${REDIS_VOLUME}/data/nodes.sh"
-      if [[ -f  "${REDIS_VOLUME}/data/nodes_flag.sh" ]]; then
+      FLAG_FILE_PATH=${REDIS_VOLUME}/data/nodes_flag.sh
+      if [[ -f  "$FLAG_FILE_PATH" ]]; then
         # delete nodes.sh to force reinitialization in order to use checkpoints
         echo "deleting ${REDIS_VOLUME}/data/nodes.sh"
         rm -f "${REDIS_VOLUME}/data/nodes.sh"
@@ -271,7 +275,7 @@ redis_cluster_update_ips() {
       for node in "${nodes[@]}"; do
           debug "redis_cluster_update_ips updating CLUSTER for $node $REDIS_DNS_RETRIES .."
           newIP=$(wait_for_dns_lookup "$node" "$REDIS_DNS_RETRIES" 5)
-          declare -p host_2_ip_array > "${REDIS_VOLUME}/data/nodes_flag.sh"
+          declare -p host_2_ip_array > $FLAG_FILE_PATH
           debug "redis_cluster_update_ips updating CLUSTER for $node $REDIS_DNS_RETRIES $newIP .."
           # The node can be new if we are updating the cluster, so catch the unbound variable error
           if [[ ${host_2_ip_array[$node]+true} ]]; then
@@ -282,6 +286,6 @@ redis_cluster_update_ips() {
           host_2_ip_array["$node"]="$newIP"
       done
       declare -p host_2_ip_array > "${REDIS_VOLUME}/data/nodes.sh"
-      rm -f ${REDIS_VOLUME}/data/nodes_flag.sh
+      rm -f $FLAG_FILE_PATH
   fi
 }
