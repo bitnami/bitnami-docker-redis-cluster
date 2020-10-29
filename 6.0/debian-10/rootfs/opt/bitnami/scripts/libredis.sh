@@ -402,5 +402,4 @@ redis_configure_default() {
             redis_disable_unsafe_commands
         fi
     fi
-    debug "done setting Redis config file..."
 }
